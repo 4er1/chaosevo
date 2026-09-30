@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chaosevo
+  namespace: {{ chaosevo_namespace }}
+  labels:
+    release: {{ chaosevo_prometheus_release_label }}
+spec:
+  selector:
+    matchLabels:
+      app: chaosevo
+  endpoints:
+    - port: metrics
+      interval: 5s

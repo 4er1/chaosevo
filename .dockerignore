@@ -1,0 +1,9 @@
+.git
+**/__pycache__
+*.pyc
+tests
+ansible
+grafana
+prometheus
+observability
+results*.json

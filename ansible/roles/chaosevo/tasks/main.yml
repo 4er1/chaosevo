@@ -1,0 +1,80 @@
+---
+- name: Sanity checks
+  ansible.builtin.assert:
+    that:
+      - chaosevo_target_deployments | length > 0
+      - "'CHANGE-ME' not in chaosevo_image"
+      - not chaosevo_install_monitoring or chaosevo_grafana_admin_password | length >= 12
+    fail_msg: >-
+      Set chaosevo_image to an image the cluster can pull, list chaosevo_target_deployments, and give
+      chaosevo_grafana_admin_password (12+ chars, use ansible-vault) when installing the monitoring stack.
+    quiet: true
+
+- name: Fix the run name once (a lazily evaluated lookup would change between tasks)
+  ansible.builtin.set_fact:
+    chaosevo_run_name: "{{ chaosevo_run_id if chaosevo_run_id | length > 0 else lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+
+- name: Install monitoring stack / Chaos Mesh (optional)
+  ansible.builtin.include_tasks: extras.yml
+  when: chaosevo_install_monitoring or chaosevo_install_chaos_mesh
+
+- name: Namespaces
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ item }}"
+  loop: "{{ [chaosevo_namespace, chaosevo_target_namespace] | unique }}"
+
+- name: Demo target application (podinfo)
+  kubernetes.core.k8s:
+    state: present
+    template: demo-app.yml.j2
+  when: chaosevo_deploy_demo_app
+
+- name: RBAC - least privilege, limited to the namespace under attack
+  kubernetes.core.k8s:
+    state: present
+    template: rbac.yml.j2
+
+- name: Configuration of the search
+  kubernetes.core.k8s:
+    state: present
+    template: configmap.yml.j2
+
+- name: Metrics Service for the search
+  kubernetes.core.k8s:
+    state: present
+    template: service.yml.j2
+
+- name: ServiceMonitor so Prometheus scrapes the search
+  kubernetes.core.k8s:
+    state: present
+    template: servicemonitor.yml.j2
+  when: chaosevo_servicemonitor
+
+- name: Grafana dashboard (sidecar-discovered ConfigMap)
+  kubernetes.core.k8s:
+    state: present
+    template: dashboard-configmap.yml.j2
+  when: chaosevo_grafana_dashboard
+
+- name: Start the evolutionary search (Kubernetes Job)
+  kubernetes.core.k8s:
+    state: present
+    template: job.yml.j2
+    wait: "{{ chaosevo_wait_for_completion }}"
+    wait_condition:
+      type: Complete
+      status: "True"
+    wait_timeout: 7200
+  when: chaosevo_run
+
+- name: How to follow it
+  ansible.builtin.debug:
+    msg:
+      - "kubectl -n {{ chaosevo_namespace }} logs -f job/chaosevo-{{ chaosevo_run_name }}"
+      - "Grafana dashboard: 'chaosevo - evolution of the search' (Prometheus job: {{ chaosevo_namespace }}/chaosevo)"
+  when: chaosevo_run

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chaosevo"
+version = "0.1.0"
+description = "Evolutionary chaos engineering: a genetic algorithm that searches for the most damaging chaos experiment"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["jinja2", "pyyaml"]
+
+[project.scripts]
+chaosevo = "chaosevo.cli:main"
+
+[tool.setuptools]
+packages = ["chaosevo", "chaosevo.targets"]

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaosevo
+  namespace: {{ chaosevo_namespace }}
+  labels:
+    app: chaosevo
+spec:
+  selector:
+    app: chaosevo
+  ports:
+    - name: metrics
+      port: 9200
+      targetPort: metrics

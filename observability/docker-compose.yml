@@ -1,0 +1,39 @@
+# Watch the search evolve in Grafana on your laptop - no Kubernetes needed.
+# Runs chaosevo against its built-in simulated target (safe: nothing real is attacked).
+#   cp .env.example .env   # set GRAFANA_PASSWORD
+#   docker compose --env-file .env -f observability/docker-compose.yml up --build   (run from the project root)
+# Then open http://localhost:3000 (admin / your password): the "chaosevo - evolution" dashboard is the home page.
+name: chaosevo-observability
+
+services:
+  chaosevo:
+    build: ..
+    image: chaosevo:local
+    command: ["run", "--target", "simulated", "--generations", "25", "--population", "12", "--seed", "1",
+              "--metrics-bind", "0.0.0.0", "--metrics-port", "9200", "--linger", "3600"]
+    networks: [obs]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    networks: [obs]
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on: [chaosevo]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    networks: [obs]
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?copy .env.example to .env and set GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/chaosevo.json
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+
+networks:
+  obs:

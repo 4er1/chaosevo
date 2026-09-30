@@ -1,0 +1,52 @@
+---
+# --- where things live -------------------------------------------------------------------
+chaosevo_namespace: chaosevo
+chaosevo_image: "ghcr.io/CHANGE-ME/chaosevo:0.1.0"     # build with the Dockerfile and push it somewhere the cluster can pull from
+chaosevo_monitoring_namespace: monitoring
+
+# --- what to attack ----------------------------------------------------------------------
+chaosevo_target_namespace: demo
+chaosevo_target_deployments: [podinfo]
+chaosevo_chaos_mesh: false                 # true enables network_delay / network_loss / cpu_stress (needs Chaos Mesh installed)
+chaosevo_http_probe_url: "http://podinfo.demo.svc.cluster.local:9898/healthz"   # user-visible availability/latency probe
+
+# --- optional extras this role can install for you ----------------------------------------
+chaosevo_deploy_demo_app: true             # podinfo, 3 replicas, in chaosevo_target_namespace
+chaosevo_install_monitoring: false         # kube-prometheus-stack (Prometheus + Grafana) via Helm
+chaosevo_install_chaos_mesh: false         # Chaos Mesh via Helm (also set chaosevo_chaos_mesh: true)
+chaosevo_grafana_admin_password: ""        # REQUIRED when chaosevo_install_monitoring is true - keep it in ansible-vault
+chaosevo_chaos_mesh_runtime: containerd
+chaosevo_chaos_mesh_socket: /run/containerd/containerd.sock
+
+# --- observability -----------------------------------------------------------------------
+chaosevo_prometheus_url: "http://kube-prometheus-stack-prometheus.{{ chaosevo_monitoring_namespace }}.svc:9090"
+chaosevo_servicemonitor: true              # needs the Prometheus Operator CRDs (kube-prometheus-stack)
+chaosevo_prometheus_release_label: kube-prometheus-stack   # the operator only picks ServiceMonitors carrying this `release` label
+chaosevo_grafana_dashboard: true           # ConfigMap picked up by the Grafana dashboard sidecar
+chaosevo_dashboard_file: "{{ playbook_dir }}/../grafana/dashboards/chaosevo.json"
+
+# --- the search --------------------------------------------------------------------------
+chaosevo_run: true                         # false = deploy everything but do not start a search
+chaosevo_run_id: ""                        # suffix of the Job name; empty = current timestamp
+chaosevo_wait_for_completion: false
+chaosevo_linger_seconds: 120               # keep serving metrics after the search so Prometheus scrapes the last values
+chaosevo_ga:
+  population: 8
+  generations: 6
+  seed: 1
+  cost_weight: 0.3
+chaosevo_experiment:
+  window: 40                               # seconds of chaos per experiment
+  recovery: 30                             # seconds of observation after the faults end
+  sample_interval: 2
+chaosevo_objectives:                       # how "damage" is computed (see README)
+  - {name: error_rate, weight: 5, scale: 0.5}
+  - {name: p99_latency_s, weight: 2, scale: 2.0}
+  - {name: available_replicas_ratio, weight: 3, scale: 1.0, direction: down, baseline: 1.0}
+chaosevo_signals:                          # PromQL evaluated every sample_interval during the experiment
+  - name: available_replicas_ratio
+    source: prometheus
+    agg: min
+    query: >-
+      min(kube_deployment_status_replicas_available{namespace="{{ chaosevo_target_namespace }}"}
+      / kube_deployment_spec_replicas{namespace="{{ chaosevo_target_namespace }}"})

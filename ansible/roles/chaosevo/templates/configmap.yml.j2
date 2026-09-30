@@ -1,0 +1,22 @@
+{% set chaosevo_config = {
+  "target": {
+    "type": "kubernetes",
+    "namespace": chaosevo_target_namespace,
+    "deployments": chaosevo_target_deployments,
+    "chaos_mesh": chaosevo_chaos_mesh,
+    "http_probe": {"url": chaosevo_http_probe_url, "interval": 0.5, "timeout": 2}
+  },
+  "ga": chaosevo_ga,
+  "experiment": chaosevo_experiment,
+  "objectives": chaosevo_objectives,
+  "signals": chaosevo_signals,
+  "prometheus": {"url": chaosevo_prometheus_url}
+} %}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaosevo-config
+  namespace: {{ chaosevo_namespace }}
+data:
+  config.json: |
+{{ chaosevo_config | to_nice_json | indent(4, true) }}

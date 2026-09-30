@@ -1,0 +1,11 @@
+# Deploys chaosevo (and optionally the monitoring stack, Chaos Mesh and a demo app) on the cluster
+# your current kubeconfig points to.
+#
+#   pip install kubernetes && ansible-galaxy collection install -r requirements.yml
+#   ansible-playbook site.yml -e chaosevo_image=ghcr.io/<you>/chaosevo:0.1.0 \
+#       -e chaosevo_install_monitoring=true -e chaosevo_grafana_admin_password='...'
+- name: Deploy chaosevo
+  hosts: local
+  gather_facts: false
+  roles:
+    - chaosevo

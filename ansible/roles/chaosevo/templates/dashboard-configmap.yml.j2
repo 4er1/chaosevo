@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaosevo-dashboard
+  namespace: {{ chaosevo_monitoring_namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  chaosevo.json: |
+{{ lookup('file', chaosevo_dashboard_file) | indent(4, true) }}
